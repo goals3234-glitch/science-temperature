@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>물의 온도 변화 측정</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root { font-family: "Noto Sans KR", "Malgun Gothic", sans-serif; color:#1f2937; background:#f4f7fb; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 14px 40px; }
+  main { max-width:900px; margin:auto; }
+  header { margin-bottom:20px; }
+  h1 { margin:0 0 8px; font-size:clamp(24px,4vw,34px); }
+  .sub { color:#64748b; margin:0; line-height:1.6; }
+  .panel { background:white; border:1px solid #e5eaf1; border-radius:18px; padding:20px; margin:16px 0; box-shadow:0 4px 18px #1e293b0a; }
+  .legend { display:flex; flex-wrap:wrap; gap:18px; margin:12px 0 18px; }
+  .key { display:flex; align-items:center; gap:8px; font-weight:700; }
+  .dot { width:11px; height:11px; border-radius:50%; }
+  .blue { background:#2476e8; } .red { background:#e53935; }
+  table { width:100%; border-collapse:collapse; }
+  th,td { padding:9px 7px; text-align:center; border-bottom:1px solid #edf0f5; }
+  th { font-size:14px; color:#475569; }
+  td:first-child { font-weight:700; white-space:nowrap; }
+  input { width:100%; max-width:130px; padding:10px 8px; border:1px solid #cbd5e1; border-radius:9px; text-align:center; font:inherit; font-size:16px; }
+  input:focus { outline:2px solid #93c5fd; border-color:#3b82f6; }
+  .blue-text { color:#2476e8; } .red-text { color:#e53935; }
+  .chart-wrap { position:relative; height:340px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 15px; font:inherit; font-weight:700; cursor:pointer; }
+  .reset { background:#eef2f7; color:#334155; }
+  .sample { background:#e8f1ff; color:#1d4ed8; }
+  .note { color:#64748b; font-size:13px; line-height:1.6; }
+  .result { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .result div { background:#f8fafc; border-radius:12px; padding:14px; }
+  .result small { display:block; color:#64748b; margin-bottom:5px; }
+  .result strong { font-size:22px; }
+  @media(max-width:520px) { .panel { padding:14px; } th,td { padding:8px 3px; } input { padding:9px 2px; font-size:14px; } .chart-wrap { height:280px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>물의 온도 변화 측정</h1>
+    <p class="sub">1분 간격으로 7회 측정한 온도를 입력하고, 두 용기 속 물의 온도 변화를 그래프로 비교해 보세요.</p>
+  </header>
+
+  <section class="panel">
+    <h2>측정값 입력</h2>
+    <div class="legend">
+      <div class="key"><span class="dot blue"></span><span class="blue-text">알루미늄 캔 속 물</span></div>
+      <div class="key"><span class="dot red"></span><span class="red-text">스타이로폼 용기 속 물</span></div>
+    </div>
+    <table>
+      <thead><tr><th>측정 시간</th><th class="blue-text">알루미늄 캔 (℃)</th><th class="red-text">스타이로폼 용기 (℃)</th></tr></thead>
+      <tbody id="inputs"></tbody>
+    </table>
+    <div class="actions">
+      <button class="sample" id="sample">예시 데이터 넣기</button>
+      <button class="reset" id="reset">전체 지우기</button>
+    </div>
+    <p class="note">※ 온도를 입력하면 그래프가 자동으로 업데이트됩니다. 측정하지 않은 칸은 비워 두어도 됩니다.</p>
+  </section>
+
+  <section class="panel">
+    <h2>온도 변화 그래프</h2>
+    <div class="chart-wrap"><canvas id="chart" aria-label="두 용기 속 물의 온도 변화 꺾은선그래프"></canvas></div>
+    <p class="note">가로축은 측정 시간(분), 세로축은 물의 온도(℃)입니다.</p>
+  </section>
+
+  <section class="panel">
+    <h2>측정 결과 비교</h2>
+    <div class="result">
+      <div><small class="blue-text">알루미늄 캔 · 처음과 마지막 온도 차</small><strong id="alChange">—</strong></div>
+      <div><small class="red-text">스타이로폼 용기 · 처음과 마지막 온도 차</small><strong id="stChange">—</strong></div>
+    </div>
+  </section>
+</main>
+<script>
+const tbody = document.getElementById('inputs');
+for (let i=0;i<7;i++) {
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${i}분</td>
+    <td><input type="number" step="0.1" inputmode="decimal" aria-label="${i}분 알루미늄 캔 온도" data-series="al" data-index="${i}" placeholder="℃"></td>
+    <td><input type="number" step="0.1" inputmode="decimal" aria-label="${i}분 스타이로폼 용기 온도" data-series="st" data-index="${i}" placeholder="℃"></td>`;
+  tbody.appendChild(tr);
+}
+const labels=['0분','1분','2분','3분','4분','5분','6분'];
+const chart=new Chart(document.getElementById('chart'),{
+  type:'line',
+  data:{labels,datasets:[
+    {label:'알루미늄 캔 속 물',data:Array(7).fill(null),borderColor:'#2476e8',backgroundColor:'#2476e8',pointBackgroundColor:'#2476e8',pointRadius:5,pointHoverRadius:7,tension:0.2,spanGaps:false},
+    {label:'스타이로폼 용기 속 물',data:Array(7).fill(null),borderColor:'#e53935',backgroundColor:'#e53935',pointBackgroundColor:'#e53935',pointRadius:5,pointHoverRadius:7,tension:0.2,spanGaps:false}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}℃`}}},
+    scales:{x:{title:{display:true,text:'측정 시간'},grid:{color:'#eef2f7'}},y:{title:{display:true,text:'온도 (℃)'},grid:{color:'#eef2f7'}}}}
+});
+function values(series) {
+  return [...document.querySelectorAll(`input[data-series="${series}"]`)].map(el=>el.value.trim()===''?null:Number(el.value));
+}
+function update() {
+  chart.data.datasets[0].data=values('al');
+  chart.data.datasets[1].data=values('st');
+  chart.update();
+  updateChange('al','alChange'); updateChange('st','stChange');
+}
+function updateChange(series,id) {
+  const vals=values(series), first=vals.find(v=>v!==null), last=[...vals].reverse().find(v=>v!==null);
+  const el=document.getElementById(id);
+  el.textContent=(first===undefined||last===undefined||vals.filter(v=>v!==null).length<2)?'—':`${last-first>0?'+':''}${(last-first).toFixed(1)}℃`;
+}
+document.querySelectorAll('input').forEach(el=>el.addEventListener('input',update));
+document.getElementById('reset').addEventListener('click',()=>{
+  document.querySelectorAll('input').forEach(el=>el.value=''); update();
+});
+document.getElementById('sample').addEventListener('click',()=>{
+  const al=[40,36,33,31,29,28,27], st=[40,38,36,35,34,33,32];
+  document.querySelectorAll('input').forEach(el=>{const i=Number(el.dataset.index);el.value=(el.dataset.series==='al'?al:st)[i];});
+  update();
+});
+</script>
+</body>
+</html>
